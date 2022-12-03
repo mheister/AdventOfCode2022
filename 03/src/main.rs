@@ -12,7 +12,19 @@ fn main() {
         .map(|item_type| get_item_type_priority(item_type))
         .map(Result::unwrap)
         .sum();
-    println!("Priority total: {priority_total}")
+    println!("Priority total: {priority_total}");
+    let file = File::open(input_file_path)
+        .expect(format!("Could not open file '{input_file_path}'").as_str());
+    let badge_priority_total: u32 = BufReader::new(file)
+        .lines()
+        .map(Result::unwrap)
+        .collect::<Vec<String>>()
+        .chunks(3)
+        .map(|group| get_badge_item(&[&group[0], &group[1], &group[2]]))
+        .map(|item_type| get_item_type_priority(item_type))
+        .map(Result::unwrap)
+        .sum();
+    println!("Badge item priority total: {badge_priority_total}");
 }
 
 fn find_duplicate_item_type(rucksack: &str) -> char {
@@ -33,7 +45,18 @@ fn get_item_type_priority(item_type: char) -> Result<u32, String> {
     if item_type >= 'A' && item_type <= 'Z' {
         return Ok(item_type as u32 - 'A' as u32 + 27);
     }
-    Err(format!("Could not determine priority for item type {item_type}"))
+    Err(format!(
+        "Could not determine priority for item type {item_type}"
+    ))
+}
+
+fn get_badge_item(group: &[&str; 3]) -> char {
+    let rucksack_0_types = group[0].chars().collect::<HashSet<char>>();
+    let rucksack_1_types = group[1].chars().collect::<HashSet<char>>();
+    group[2]
+        .chars()
+        .find(|c| rucksack_0_types.contains(&c) && rucksack_1_types.contains(&c))
+        .unwrap()
 }
 
 #[cfg(test)]
