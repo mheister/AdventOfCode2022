@@ -23,6 +23,11 @@ impl SectionRange {
     fn fully_contains(&self, other: &Self) -> bool {
         self.start <= other.start && self.end >= other.end
     }
+
+    #[must_use]
+    fn overlaps_with(&self, other: &Self) -> bool {
+        self.start <= other.end && self.end >= other.start
+    }
 }
 
 impl FromStr for SectionRange {
@@ -47,6 +52,11 @@ impl ElvePair {
     #[must_use]
     fn one_section_range_contains_the_other(&self) -> bool {
         self.0.fully_contains(&self.1) || self.1.fully_contains(&self.0)
+    }
+
+    #[must_use]
+    fn section_ranges_overlap(&self) -> bool {
+        self.0.overlaps_with(&self.1)
     }
 }
 
@@ -107,6 +117,29 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn elve_pairs_should_correctly_determine_overlap(
+    ) {
+        let test_data = vec![
+            ("2-4,6-8", false),
+            ("2-3,4-5", false),
+            ("5-7,7-9", true),
+            ("2-8,3-7", true),
+            ("6-6,4-6", true),
+            ("2-6,4-8", true),
+        ];
+        for (pair_str, overlap) in test_data {
+            let pair = ElvePair::from_str(pair_str).unwrap();
+            assert_eq!(
+                pair.section_ranges_overlap(),
+                overlap,
+                "{}, parsed as {:?}",
+                pair_str,
+                pair
+            );
+        }
+    }
 }
 
 fn main() {
@@ -123,5 +156,17 @@ fn main() {
     println!(
         "Number of elve pairs where one assigned section range contains the other: {}",
         count_fully_contained
+    );
+    let file = File::open(input_file_path)
+        .expect(format!("Could not open file '{input_file_path}'").as_str());
+    let count_overlap = BufReader::new(file)
+        .lines()
+        .map(|ln| ElvePair::from_str(&ln.unwrap()).unwrap())
+        .map(|pair| ElvePair::section_ranges_overlap(&pair))
+        .filter(|x| *x)
+        .count();
+    println!(
+        "Number of elve pairs where the assigned section ranges overlap: {}",
+        count_overlap
     );
 }
