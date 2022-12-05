@@ -16,7 +16,7 @@ fn main() {
     let (stacks, procedure) = input.split_once("\n\n").expect(
         "Expecting two paragraphs in input: intial stacks and rearrangement procedure",
     );
-    let mut stacks = {
+    let stacks = {
         let mut result: Vec<Vec<char>> = vec![];
         for line in stacks.lines().rev().skip(1) {
             for (idx, crate_id) in line.chars().skip(1).step_by(4).enumerate() {
@@ -51,15 +51,30 @@ fn main() {
             }
         })
         .collect::<Vec<_>>();
-    for mov in procedure {
-        assert!(mov.to != mov.from);
-        // println!("Moving {} crates from {} to {}", mov.n, mov.from, mov.to);
-        let from = &stacks[mov.from - 1];
-        let moved_crates = from[from.len() - mov.n..].to_owned();
-        moved_crates.iter().rev().for_each(|&c| stacks[mov.to - 1].push(c));
-        let new_source_stack_len = stacks[mov.from - 1].len() - mov.n;
-        stacks[mov.from - 1].resize(new_source_stack_len, 'X');
+    {
+        let mut stacks_part1 = stacks.clone();
+        for mov in &procedure {
+            assert!(mov.to != mov.from);
+            let from = &stacks_part1[mov.from - 1];
+            let moved_crates = from[from.len() - mov.n..].to_owned();
+            moved_crates.iter().rev().for_each(|&c| stacks_part1[mov.to - 1].push(c));
+            let new_source_stack_len = stacks_part1[mov.from - 1].len() - mov.n;
+            stacks_part1[mov.from - 1].resize(new_source_stack_len, 'X');
+        }
+        let tops = stacks_part1.iter().filter_map(|stack| stack.last()).collect::<String>();
+        println!("Top crates: {}", tops);
     }
-    let tops = stacks.iter().filter_map(|stack| stack.last()).collect::<String>();
-    println!("Top crates: {}", tops)
+    {
+        let mut stacks_part2 = stacks.clone();
+        for mov in &procedure {
+            assert!(mov.to != mov.from);
+            let from = &stacks_part2[mov.from - 1];
+            let moved_crates = from[from.len() - mov.n..].to_owned();
+            moved_crates.iter().for_each(|&c| stacks_part2[mov.to - 1].push(c));
+            let new_source_stack_len = stacks_part2[mov.from - 1].len() - mov.n;
+            stacks_part2[mov.from - 1].resize(new_source_stack_len, 'X');
+        }
+        let tops = stacks_part2.iter().filter_map(|stack| stack.last()).collect::<String>();
+        println!("Top crates: {}", tops);
+    }
 }
