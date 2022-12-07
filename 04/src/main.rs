@@ -15,6 +15,7 @@ struct SectionRange {
 struct ElvePair(SectionRange, SectionRange);
 
 impl SectionRange {
+    #[allow(dead_code)]
     fn new(start: u32, end: u32) -> Self {
         Self { start, end }
     }
