@@ -72,15 +72,18 @@ fn ls(current_dir: &str, arg: &str) -> String {
 }
 
 fn read_term_output(oup: &str) -> Vec<Directory> {
-    let mut result = oup.lines()
+    let mut result = oup
+        .lines()
         .fold(
-            (HashMap::new(), "".to_string()),
-            |(mut dirs, mut cwd), ln| {
+            (HashMap::new(), "".to_string(), false),
+            |(mut dirs, mut cwd, visiting_new_dir), ln| {
                 if let Some(cmd) = parse_command(ln) {
                     match cmd {
                         Command::Cd(arg) => {
                             cwd = ls(&cwd, arg);
-                            if !dirs.contains_key(&cwd) {
+                            if dirs.contains_key(&cwd) {
+                                return (dirs, cwd, false);
+                            } else {
                                 dirs.insert(
                                     cwd.clone(),
                                     Directory {
@@ -88,11 +91,15 @@ fn read_term_output(oup: &str) -> Vec<Directory> {
                                         size: 0,
                                     },
                                 );
+                                return (dirs, cwd, true);
                             }
                         }
                         Command::Ls => {}
                     }
-                    return (dirs, cwd);
+                    return (dirs, cwd, visiting_new_dir);
+                }
+                if !visiting_new_dir {
+                    return (dirs, cwd, false);
                 }
                 match parse_ls_output_line(ln) {
                     Ok(LsOutputLine::File(size, _name)) => {
@@ -100,21 +107,20 @@ fn read_term_output(oup: &str) -> Vec<Directory> {
                         let mut tmp = cwd.clone();
                         loop {
                             if let Some(dir) = dirs.get_mut(&tmp) {
-                                dbg!(&dir.path);
                                 dir.size += size;
                                 if tmp == "/" {
-                                    break
+                                    break;
                                 }
                                 tmp = ls(&tmp, "..");
                             } else {
-                                break
+                                break;
                             }
                         }
                     }
                     Ok(LsOutputLine::Dir(_name)) => {}
                     Err(err) => panic!("Error parsing ls out-ln: {}", err),
                 }
-                (dirs, cwd)
+                (dirs, cwd, true)
             },
         )
         .0
@@ -235,6 +241,121 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn read_term_output_visit_subdir_twice() {
+        assert_eq!(
+            read_term_output(
+                "$ cd /\n\
+                 $ ls\n\
+                 11 hello\n\
+                 dir yy\n\
+                 $ cd yy\n\
+                 $ ls\n\
+                 22 world\n\
+                 $ cd ..\n\
+                 $ cd yy\n\
+                 $ ls\n\
+                 22 world\n\
+                 "
+            ),
+            vec![
+                Directory {
+                    path: "/".to_string(),
+                    size: 33
+                },
+                Directory {
+                    path: "/yy".to_string(),
+                    size: 22
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn read_term_output_r1() {
+        assert_eq!(
+            read_term_output(
+                "$ cd /\n\
+                 $ ls\n\
+                 11 hello\n\
+                 dir l1\n\
+                 $ cd l1\n\
+                 $ ls\n\
+                 dir l2\n\
+                 22 world\n\
+                 $ cd l2\n\
+                 $ ls\n\
+                 dir l3\n\
+                 22 world\n\
+                 $ cd l3\n\
+                 $ ls\n\
+                 33 b\n\
+                 "
+            ),
+            vec![
+                Directory {
+                    path: "/".to_string(),
+                    size: 88
+                },
+                Directory {
+                    path: "/l1".to_string(),
+                    size: 77
+                },
+                Directory {
+                    path: "/l1/l2".to_string(),
+                    size: 55
+                },
+                Directory {
+                    path: "/l1/l2/l3".to_string(),
+                    size: 33
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn read_term_output_r2() {
+        assert_eq!(
+            read_term_output(
+                "$ cd /\n\
+                 $ ls\n\
+                 11 hello\n\
+                 dir l1\n\
+                 $ cd l1\n\
+                 $ ls\n\
+                 dir l2a\n\
+                 dir l2b\n\
+                 22 world\n\
+                 $ cd l2a\n\
+                 $ ls\n\
+                 22 world\n\
+                 $ cd ..\n\
+                 $ cd l2b\n\
+                 $ ls\n\
+                 33 b\n\
+                 "
+            ),
+            vec![
+                Directory {
+                    path: "/".to_string(),
+                    size: 88
+                },
+                Directory {
+                    path: "/l1".to_string(),
+                    size: 77
+                },
+                Directory {
+                    path: "/l1/l2b".to_string(),
+                    size: 33
+                },
+                Directory {
+                    path: "/l1/l2a".to_string(),
+                    size: 22
+                },
+            ]
+        );
+    }
 }
 
 fn main() {
@@ -242,5 +363,14 @@ fn main() {
     let input = fs::read_to_string(&input_file_path)
         .expect(&format!("Error reading input file {input_file_path}"));
     let dirs = read_term_output(&input);
-    dbg!(dirs);
+    const PART1_SMALL_DIR_LIMIT: u64 = 100_000;
+    let sum_of_small_dir_sizes: u64 = dirs
+        .iter()
+        .map(|d| d.size)
+        .filter(|&s| s <= PART1_SMALL_DIR_LIMIT)
+        .sum();
+    println!(
+        "Sum of all direcctories of size at most {}: {}",
+        PART1_SMALL_DIR_LIMIT, sum_of_small_dir_sizes
+    );
 }
