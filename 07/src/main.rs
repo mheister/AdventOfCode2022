@@ -373,4 +373,11 @@ fn main() {
         "Sum of all direcctories of size at most {}: {}",
         PART1_SMALL_DIR_LIMIT, sum_of_small_dir_sizes
     );
+    const TOTAL_DISK_SPACE: u64 = 70000000;
+    const REQUIRED_DISK_SPACE: u64 = 30000000;
+    let amount_to_delete = REQUIRED_DISK_SPACE + dirs[0].size - TOTAL_DISK_SPACE;
+    let dir_to_delete = dirs.iter().rfind(|d| d.size >= amount_to_delete).unwrap();
+    println!("Need to free up {amount_to_delete}, should delete {} with size {}",
+             dir_to_delete.path, dir_to_delete.size
+    )
 }
