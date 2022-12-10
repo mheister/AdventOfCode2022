@@ -50,14 +50,18 @@ impl<const L: usize> RopeBridge<L> {
     }
 
     fn relax_rope(&mut self) {
-        let head = self.rope.first().unwrap().clone();
+        if L < 2 {
+            return;
+        }
+        let mut precursor = self.rope.first().unwrap().clone();
         for knot in self.rope.iter_mut().skip(1) {
-            let dx = head.0 - knot.0;
-            let dy = head.1 - knot.1;
+            let dx = precursor.0 - knot.0;
+            let dy = precursor.1 - knot.1;
             if dx.abs() > 1 || dy.abs() > 1 {
                 knot.0 += dx.signum();
                 knot.1 += dy.signum();
             }
+            precursor = knot.clone();
         }
         if let Some(tail) = self.rope.last() {
             self.visited.insert(*tail);
@@ -120,4 +124,16 @@ mod ropebridge_tests {
         assert_eq!(b.tail(), (0, 0));
         assert_eq!(b.count_visited_positions(), 1);
     }
+
+    #[test]
+    fn rope_should_follow_when_two_steps_away() {
+        let mut b = RopeBridge::<3>::new();
+        b.motion(Direction::R, 2);
+        // middle moves between head and tail, relaxing the rope without moving tail
+        assert_eq!(b.tail(), (0, 0));
+        b.motion(Direction::R, 1);
+        assert_eq!(b.tail(), (1, 0));
+        assert_eq!(b.count_visited_positions(), 2);
+    }
+
 }
