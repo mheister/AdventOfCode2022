@@ -26,14 +26,14 @@ fn main() {
     let input_file_path = env::args().nth(1).unwrap_or("09/test_data.txt".into());
     let input = fs::read_to_string(&input_file_path)
         .expect(&format!("Error reading input file {input_file_path}"));
-    let mut bridge = RopeBridge::new();
+    let mut bridge_p1 = RopeBridge::<2>::new();
     for m in parse_movements(&input) {
-        bridge.motion(m.0, m.1);
+        bridge_p1.motion(m.0, m.1);
     }
-    println!("Head: {},{}", bridge.head().0, bridge.head().1);
-    println!("Tail: {},{}", bridge.tail().0, bridge.tail().1);
+    println!("Head: {},{}", bridge_p1.head().0, bridge_p1.head().1);
+    println!("Tail: {},{}", bridge_p1.tail().0, bridge_p1.tail().1);
     println!(
         "Number of positions visited by tail: {}",
-        bridge.count_visited_positions()
+        bridge_p1.count_visited_positions()
     );
 }

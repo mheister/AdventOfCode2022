@@ -8,27 +8,25 @@ pub enum Direction {
     D,
 }
 
-pub struct RopeBridge {
-    head: (i32, i32),
-    tail: (i32, i32),
+pub struct RopeBridge<const L: usize> {
+    rope: [(i32, i32); L],
     visited: HashSet<(i32, i32)>,
 }
 
-impl RopeBridge {
+impl<const L: usize> RopeBridge<L> {
     pub fn new() -> Self {
         Self {
-            head: (0, 0),
-            tail: (0, 0),
+            rope: [(0, 0); L],
             visited: HashSet::from([(0, 0)]),
         }
     }
 
     pub fn head(&self) -> (i32, i32) {
-        self.head
+        self.rope.first().cloned().unwrap_or((0, 0))
     }
 
     pub fn tail(&self) -> (i32, i32) {
-        self.tail
+        self.rope.last().cloned().unwrap_or((0, 0))
     }
 
     pub fn motion(&mut self, dir: Direction, count: usize) {
@@ -39,8 +37,11 @@ impl RopeBridge {
             Direction::D => (0, -1),
         };
         for _ in 0..count {
-            self.head = (self.head.0 + step.0, self.head.1 + step.1);
-            self.tail_motion();
+            if let Some(head) = self.rope.first_mut() {
+                head.0 += step.0;
+                head.1 += step.1;
+            }
+            self.relax_rope();
         }
     }
 
@@ -48,13 +49,18 @@ impl RopeBridge {
         self.visited.len()
     }
 
-    fn tail_motion(&mut self) {
-        let dx = self.head.0 - self.tail.0;
-        let dy = self.head.1 - self.tail.1;
-        if dx.abs() > 1 || dy.abs() > 1 {
-            self.tail.0 += dx.signum();
-            self.tail.1 += dy.signum();
-            self.visited.insert(self.tail);
+    fn relax_rope(&mut self) {
+        let head = self.rope.first().unwrap().clone();
+        for knot in self.rope.iter_mut().skip(1) {
+            let dx = head.0 - knot.0;
+            let dy = head.1 - knot.1;
+            if dx.abs() > 1 || dy.abs() > 1 {
+                knot.0 += dx.signum();
+                knot.1 += dy.signum();
+            }
+        }
+        if let Some(tail) = self.rope.last() {
+            self.visited.insert(*tail);
         }
     }
 }
@@ -65,7 +71,7 @@ mod ropebridge_tests {
 
     #[test]
     fn new() {
-        let b = RopeBridge::new();
+        let b = RopeBridge::<2>::new();
         assert_eq!(b.head(), (0, 0));
         assert_eq!(b.tail(), (0, 0));
         assert_eq!(b.count_visited_positions(), 1);
@@ -73,7 +79,7 @@ mod ropebridge_tests {
 
     #[test]
     fn vertical_motion() {
-        let mut b = RopeBridge::new();
+        let mut b = RopeBridge::<2>::new();
         b.motion(Direction::R, 1);
         assert_eq!(b.head(), (1, 0));
         assert_eq!(b.tail(), (0, 0));
@@ -86,7 +92,7 @@ mod ropebridge_tests {
 
     #[test]
     fn horizontal_motion() {
-        let mut b = RopeBridge::new();
+        let mut b = RopeBridge::<2>::new();
         b.motion(Direction::U, 1);
         assert_eq!(b.head(), (0, 1));
         assert_eq!(b.tail(), (0, 0));
@@ -99,7 +105,7 @@ mod ropebridge_tests {
 
     #[test]
     fn tail_should_follow_when_two_steps_away() {
-        let mut b = RopeBridge::new();
+        let mut b = RopeBridge::<2>::new();
         b.motion(Direction::R, 2);
         assert_eq!(b.head(), (2, 0));
         assert_eq!(b.tail(), (1, 0));
@@ -108,7 +114,7 @@ mod ropebridge_tests {
 
     #[test]
     fn tail_should_not_follow_when_touching_diagonally() {
-        let mut b = RopeBridge::new();
+        let mut b = RopeBridge::<2>::new();
         b.motion(Direction::R, 1);
         b.motion(Direction::U, 1);
         assert_eq!(b.tail(), (0, 0));
