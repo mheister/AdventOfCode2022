@@ -32,15 +32,32 @@ fn main() {
         };
         Some((*start_cycle, current_x))
     });
+    let mut x_value_iter_1 = x_value_iter.clone();
     let signal_strength: i64 = (20..=220)
         .step_by(40)
         .map(|cycle| {
             cycle
-                * x_value_iter
+                * x_value_iter_1
                     .find(|(x_value_cycle, _)| *x_value_cycle >= cycle)
                     .expect("Missing some X values")
                     .1
         })
         .sum();
-    print!("{signal_strength}");
+    println!("Part one signal strength: {signal_strength}");
+
+    for row_start_cycle in (1..=201).step_by(40) {
+        let (mut x_valid_until, mut x) = x_value_iter.next().unwrap();
+        for col_offset in 0..40 {
+            let cycle = row_start_cycle + col_offset;
+            if cycle > x_valid_until {
+                (x_valid_until, x) = x_value_iter.next().unwrap();
+            }
+            if (x - col_offset).abs() < 2 {
+                print!("#");
+            } else {
+                print!(".");
+            }
+        }
+        println!()
+    }
 }
