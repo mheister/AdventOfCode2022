@@ -9,7 +9,7 @@ use nom::{
 #[derive(Debug, Clone)]
 pub struct Monkey {
     pub idx: usize,
-    pub starting_items: Vec<i32>,
+    pub starting_items: Vec<usize>,
     pub operation: Operation,
     pub test: Test,
 }
@@ -17,7 +17,7 @@ pub struct Monkey {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Operand {
     Old,
-    Constant(i32),
+    Constant(usize),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -28,7 +28,7 @@ pub enum Operation {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Test {
-    pub divisor: u32,
+    pub divisor: usize,
     pub true_target: usize,
     pub false_target: usize,
 }
@@ -49,11 +49,11 @@ fn test_parse_monkey_head() {
     assert_eq!(result, 11);
 }
 
-fn parse_monkey_starting_items(input: &str) -> IResult<&str, Vec<i32>> {
+fn parse_monkey_starting_items(input: &str) -> IResult<&str, Vec<usize>> {
     let mut result = vec![];
     let (input, _) = tuple((tag("  Starting items:"), space0))(input)?;
     let mut input = input;
-    let mut item: Option<i32>;
+    let mut item: Option<usize>;
     loop {
         (input, _) = space0(input)?;
         (input, item) = opt(map_res(digit1, str::parse))(input)?;
