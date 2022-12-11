@@ -29,7 +29,7 @@ Monkey 3:
 Monkey 4:
   Starting items: 50
   Operation: new = old + 6
- Monkey Test: divisible by 13
+  Test: divisible by 13
     If true: throw to monkey 3
     If false: throw to monkey 1
 

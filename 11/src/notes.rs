@@ -1,14 +1,10 @@
 use nom::{
-    bytes::{complete::take_until1, complete::tag},
+    bytes::complete::tag,
     character::complete::{digit1, multispace0, newline, one_of, space0},
     combinator::{map_res, opt},
     sequence::tuple,
     IResult,
 };
-
-pub struct Notes {
-    pub monkeys: Vec<Monkey>,
-}
 
 #[derive(Debug, Clone)]
 pub struct Monkey {
@@ -32,9 +28,9 @@ pub enum Operation {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Test {
-    divisor: u32,
-    true_target: usize,
-    false_target: usize,
+    pub divisor: u32,
+    pub true_target: usize,
+    pub false_target: usize,
 }
 
 fn parse_monkey_head(input: &str) -> IResult<&str, usize> {
