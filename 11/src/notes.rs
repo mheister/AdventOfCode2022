@@ -1,5 +1,3 @@
-#![allow(dead_code)] // TODO
-
 use nom::{
     bytes::{complete::take_until1, complete::tag},
     character::complete::{digit1, multispace0, newline, one_of, space0},
@@ -18,14 +16,6 @@ pub struct Monkey {
     pub starting_items: Vec<i32>,
     pub operation: Operation,
     pub test: Test,
-}
-
-// TODO remove
-#[derive(Debug, Clone, PartialEq)]
-pub enum MonkeyProp {
-    StartingItems(Vec<i32>),
-    Operation(Operation),
-    Test(Test),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -157,75 +147,6 @@ fn parse_monkey_test(input: &str) -> IResult<&str, Test> {
         },
     ))
 }
-
-// TODO remove
-fn parse_monkey_prop(input: &str) -> IResult<&str, MonkeyProp> {
-    let (input, (_, prop_name, _)) =
-        tuple((tag("  "), take_until1(":"), tag(":")))(input)?;
-    match prop_name {
-        "Starting items" => {
-            let (input, starting_items) = parse_monkey_starting_items(input)?;
-            Ok((input, MonkeyProp::StartingItems(starting_items)))
-        }
-        "Operation" => {
-            let (input, op) = parse_monkey_operation(input)?;
-            Ok((input, MonkeyProp::Operation(op)))
-        }
-        "Test" => {
-            let (input, test) = parse_monkey_test(input)?;
-            Ok((input, MonkeyProp::Test(test)))
-        }
-        _ => {
-            return Err(nom::Err::Error(nom::error::Error {
-                input,
-                code: nom::error::ErrorKind::Tag,
-            }))
-        }
-    }
-}
-
-// #[cfg(test)]
-// mod parse_monkey_props {
-//     use super::*;
-//
-//     #[test]
-//     fn starting_items() {
-//         let input = "  Starting items: 79, 98\n";
-//         let (rest, result) = parse_monkey_prop(input).unwrap();
-//         assert_eq!(result, MonkeyProp::StartingItems(vec![79, 98]));
-//         assert_eq!(rest, "\n");
-//     }
-//
-//     #[test]
-//     fn operation() {
-//         let input = "  Operation: new = old * 19\n";
-//         let (rest, result) = parse_monkey_prop(input).unwrap();
-//         assert_eq!(
-//             result,
-//             MonkeyProp::Operation(Operation::Multiply(
-//                 Operand::Old,
-//                 Operand::Constant(19)
-//             ))
-//         );
-//         assert_eq!(rest, "\n");
-//     }
-//
-//     #[test]
-//     fn test() {
-//         let input = "  Test: divisible by 13\n    If true: throw to monkey 3\n    If false: throw to monkey 1\n";
-//         dbg!(input);
-//         let (rest, result) = parse_monkey_test(input).unwrap();
-//         assert_eq!(
-//             result,
-//             Test {
-//                 divisor: 13,
-//                 true_target: 3,
-//                 false_target: 1
-//             }
-//         );
-//         assert_eq!(rest, "\n");
-//     }
-// }
 
 fn parse_monkey(input: &str) -> IResult<&str, Monkey> {
     let (input, (idx, starting_items, operation, test)) = tuple((
