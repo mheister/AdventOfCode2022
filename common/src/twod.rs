@@ -66,3 +66,23 @@ impl<T> std::ops::IndexMut<Point> for Grid<T> {
         &mut self.data[p.x as usize + self.width * p.y as usize]
     }
 }
+
+impl<T> Grid<T>
+where
+    T: Copy,
+{
+    pub fn fill_path(&mut self, path: &[Point], item: T) {
+        for segment in path.windows(2) {
+            self.fill_line(*segment.get(0).unwrap(), *segment.get(1).unwrap(), item);
+        }
+    }
+    pub fn fill_line(&mut self, p1: Point, p2: Point, item: T) {
+        let mut p = p1;
+        while p != p2 {
+            self[p] = item;
+            let (step_x, step_y) = ((p2.x - p1.x).signum(), (p2.y - p1.y).signum());
+            p = Point { x: p.x + step_x, y: p.y + step_y }
+        }
+        self[p2] = item;
+    }
+}
