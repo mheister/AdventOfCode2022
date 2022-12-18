@@ -34,6 +34,22 @@ impl FromStr for Cave {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_str_int(s, CaveType::Bottomless)
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum CaveType {
+    Bottomless,
+    WithBottom,
+}
+
+impl Cave {
+    pub fn from_str_with_bottom(s: &str) -> anyhow::Result<Self> {
+        Self::from_str_int(s, CaveType::WithBottom)
+    }
+
+    fn from_str_int(s: &str, kind: CaveType) -> anyhow::Result<Self> {
         let paths = s
             .lines()
             .map(|ln| {
@@ -55,11 +71,25 @@ impl FromStr for Cave {
                     .context("Failed to parse path {ln}")
             })
             .collect::<Result<Vec<Vec<_>>, _>>()?;
-        let x_min = paths.iter().flatten().map(|p| p.x).min().unwrap_or(0);
-        let x_max = paths.iter().flatten().map(|p| p.x).max().unwrap_or(0);
-        let y_max = paths.iter().flatten().map(|p| p.y).max().unwrap_or(0);
-        let x_offset = x_min;
-        let width = (x_max - x_min + 1) as usize;
+        let paths_x_min = paths.iter().flatten().map(|p| p.x).min().unwrap_or(0);
+        let paths_x_max = paths.iter().flatten().map(|p| p.x).max().unwrap_or(0);
+        let paths_y_max = paths.iter().flatten().map(|p| p.y).max().unwrap_or(0);
+        let y_max = match kind {
+            CaveType::Bottomless => paths_y_max,
+            CaveType::WithBottom => 2 + paths_y_max,
+        };
+        let x_offset = match kind {
+            CaveType::Bottomless => paths_x_min,
+            CaveType::WithBottom => {
+                std::cmp::min(paths_x_min - paths_y_max, SAND_SOURCE_X - y_max)
+            } // in case it fills a pyramid
+        };
+        let width = match kind {
+            CaveType::Bottomless => (paths_x_max - paths_x_min + 1) as usize,
+            CaveType::WithBottom => {
+                (paths_x_max - x_offset + 1 + 2 * paths_y_max) as usize
+            }
+        };
         let grid_size = width * (y_max + 1) as usize;
         let mut grid = Grid {
             data: vec![Tile::Air; grid_size],
@@ -69,6 +99,16 @@ impl FromStr for Cave {
             let mut offset_path = path.clone();
             offset_path.iter_mut().for_each(|p| p.x -= x_offset);
             grid.fill_path(&offset_path, Tile::Rock);
+        }
+        if kind == CaveType::WithBottom {
+            grid.fill_line(
+                Point { x: 0, y: y_max },
+                Point {
+                    x: width as i32 - 1,
+                    y: y_max,
+                },
+                Tile::Rock,
+            );
         }
         grid[Point {
             x: SAND_SOURCE_X - x_offset,
@@ -139,7 +179,7 @@ impl Cave {
     pub fn fill_sand(&mut self) {
         let spawn_point = Point {
             x: SAND_SOURCE_X - self.x_offset,
-            y: 1,
+            y: 0,
         };
         loop {
             let res = self.drop_sand(spawn_point);
@@ -150,7 +190,12 @@ impl Cave {
     }
 
     pub fn count_sand(&self) -> usize {
-        self.grid.data.iter().cloned().filter(|&tile| tile == Tile::Sand).count()
+        self.grid
+            .data
+            .iter()
+            .cloned()
+            .filter(|&tile| tile == Tile::Sand)
+            .count()
     }
 }
 
@@ -201,5 +246,17 @@ mod tests {
              0009 #########."
         );
         assert_eq!(cave.count_sand(), 24);
+    }
+
+    #[test]
+    fn fill_sample_cave_with_bottom() {
+        let mut cave: Cave = Cave::from_str_with_bottom(
+            "498,4 -> 498,6 -> 496,6\n\
+             503,4 -> 502,4 -> 502,9 -> 494,9",
+        )
+        .unwrap();
+        cave.fill_sand();
+        println!("{}", cave.to_string());
+        assert_eq!(cave.count_sand(), 93);
     }
 }
