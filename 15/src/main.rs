@@ -1,6 +1,6 @@
 use common::twod::Point;
 use nom::{bytes::complete::tag, sequence::tuple};
-use std::{env, fs, collections::HashSet};
+use std::{collections::HashSet, env, fs};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct SensorReport {
@@ -81,19 +81,60 @@ impl RowCoverage {
     fn covered_len(&self) -> i32 {
         self.ranges.iter().map(|r| r.end - r.start + 1).sum()
     }
+
+    fn narrow(&self, range: Range) -> RowCoverage {
+        let mut iter = self.ranges.iter();
+        let mut narrowed_ranges = vec![];
+        if let Some(mut first_relevant) = iter.find(|r| r.end >= range.start).cloned() {
+            first_relevant.start = std::cmp::max(first_relevant.start, range.start);
+            narrowed_ranges.push(first_relevant);
+            for r in iter {
+                if r.start > range.end {
+                    break;
+                }
+                narrowed_ranges.push(r.clone());
+            }
+            let last_relevant = narrowed_ranges.last_mut().unwrap();
+            last_relevant.end = std::cmp::min(last_relevant.end, range.end);
+        }
+        RowCoverage {
+            ranges: narrowed_ranges,
+        }
+    }
 }
 
 fn main() -> anyhow::Result<()> {
     let input_file_path = env::args().nth(1).unwrap_or("15/input.txt".into());
     let input = fs::read_to_string(&input_file_path).unwrap();
-    let row_of_interest: i32 = env::args()
-        .nth(2)
-        .and_then(|a| a.parse::<i32>().ok())
-        .unwrap_or(2000000);
+    let input_kind = env::args().nth(2).unwrap_or("full".to_owned());
+    let (row_of_interest, xy_max) = match input_kind.as_str() {
+        "test" => (10, 20),
+        _ => (2000000, 4000000),
+    };
+    let reports: Vec<_> = input
+        .lines()
+        .map(|ln| {
+            let (_, rep) = parse_sensor_report(ln).expect("error parsing ln");
+            rep
+        })
+        .collect();
+    let covered = part1_get_num_covered_positions(&reports, row_of_interest);
+    println!("Number of covered postitions: {covered}");
+    let distress_beacon_pos =
+        part2_get_beacon_position(&reports, xy_max).expect("Distres beacon was not found");
+    let tuning_frequency =
+        4000000 * distress_beacon_pos.0 as usize + distress_beacon_pos.1 as usize;
+    println!("Tuning frequency is {tuning_frequency}");
+    Ok(())
+}
+
+fn part1_get_num_covered_positions(
+    reports: &Vec<SensorReport>,
+    row_of_interest: i32,
+) -> usize {
     let mut no_beacon_coverage = RowCoverage::new();
     let mut beacons_in_line = HashSet::<i32>::new();
-    for ln in input.lines() {
-        let (_, rep) = parse_sensor_report(ln).expect("error parsing ln");
+    for rep in reports {
         if rep.beacon.y == row_of_interest {
             beacons_in_line.insert(rep.beacon.x);
         }
@@ -107,7 +148,38 @@ fn main() -> anyhow::Result<()> {
             });
         }
     }
-    let covered = no_beacon_coverage.covered_len() as usize - beacons_in_line.len();
-    println!("Number of covered postitions: {covered}");
-    Ok(())
+    no_beacon_coverage.covered_len() as usize - beacons_in_line.len()
+}
+
+fn part2_get_beacon_position(
+    reports: &Vec<SensorReport>,
+    xy_max: i32,
+) -> Option<(i32, i32)> {
+    for y in 0..xy_max {
+        let mut no_beacon_coverage = RowCoverage::new();
+        for rep in reports {
+            let dist =
+                (rep.sensor.x - rep.beacon.x).abs() + (rep.sensor.y - rep.beacon.y).abs();
+            let reach = dist - (y - rep.sensor.y).abs();
+            if reach > 0 {
+                no_beacon_coverage.cover(Range {
+                    start: rep.sensor.x - reach,
+                    end: rep.sensor.x + reach,
+                });
+            }
+        }
+        let no_beacon_coverage = no_beacon_coverage.narrow(Range {
+            start: 0,
+            end: xy_max,
+        });
+        if no_beacon_coverage.covered_len() < xy_max + 1 {
+            let x = no_beacon_coverage
+                .ranges
+                .first()
+                .map(|r| r.end + 1)
+                .unwrap_or(0);
+            return Some((x, y));
+        }
+    }
+    None
 }
