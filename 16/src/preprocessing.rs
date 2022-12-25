@@ -29,6 +29,13 @@ impl BitOr<u64> for ValveBitMask {
     }
 }
 
+impl FromIterator<ValveIdx> for ValveBitMask {
+    fn from_iter<T: IntoIterator<Item = ValveIdx>>(iter: T) -> Self {
+        iter.into_iter()
+            .fold(ValveBitMask(0), |acc, idx| acc | (1u64 << idx))
+    }
+}
+
 pub struct ValveIndices {
     mask: ValveBitMask,
     current: ValveIdx,
@@ -95,11 +102,13 @@ impl From<&input::Cave> for Cave {
             .iter()
             .map(|label| {
                 let valve = input.get(label).unwrap();
-                let tunnels = valve.tunnels.iter().fold(ValveBitMask(0), |acc, t| {
-                    let target_valve_idx =
-                        valve_labels.iter().position(|l| *l == *t).unwrap();
-                    acc | (1u64 << target_valve_idx)
-                });
+                let tunnels = valve
+                    .tunnels
+                    .iter()
+                    .map(|label| {
+                        valve_labels.iter().position(|l| *l == *label).unwrap() as ValveIdx
+                    })
+                    .collect();
                 Valve {
                     flow_rate: valve.flow_rate,
                     tunnels,

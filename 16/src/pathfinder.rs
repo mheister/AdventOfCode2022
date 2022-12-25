@@ -90,8 +90,8 @@ pub fn find_pressure_release_potential(cave: Cave) -> anyhow::Result<u32> {
         .enumerate()
         // valves with zero potential flow rate might as well be considered open from the start
         .filter(|(_, v)| v.flow_rate > 0)
-        .map(|(idx, _)| idx)
-        .fold(ValveBitMask(0), |acc, idx| acc | (1u64 << idx));
+        .map(|(idx, _)| idx as ValveIdx)
+        .collect();
     states.push(State {
         pos: cave
             .valve_labels
