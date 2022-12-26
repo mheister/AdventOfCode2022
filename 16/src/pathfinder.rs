@@ -6,7 +6,7 @@ use local_vec::LocalVec;
 use crate::{input::ValveLabel, preprocessing::*};
 
 /// A node in the solution search tree
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct State {
     positions: LocalVec<ValveIdx, 2>,
     closed_valves: ValveBitMask,
@@ -15,6 +15,7 @@ struct State {
     time_left: u32,
 }
 
+#[derive(Debug)]
 enum StateCmp {
     StrictlyBetter,
     StrictlyWorseOrEqual,
@@ -33,12 +34,31 @@ impl State {
         {
             return StateCmp::StrictlyWorseOrEqual;
         }
-        // We know here that the states are not equally as good
         if self.score >= other.score
             && self.time_left >= other.time_left
             && self.closed_valves.is_superset(other.closed_valves)
         {
+            // We know here that the states are not equally as good due to the previous
+            // check
             return StateCmp::StrictlyBetter;
+        }
+        // Extra pruning: If we have more time left, but our score is still lower after an
+        // ideal run of opening valves (assuming the biggest valves are still open), then
+        // we are still worse or equal
+        //
+        // FIXME: I am not sure why we do not need to compare the closed_valves for this
+        // condition; the program produces the right answer for both example and real
+        // input, however, maybe this is just a very good heuristic
+        if self.score < other.score {
+            let score_upper_bound: u32 = self.score
+                + (self.time_left / 2..=other.time_left / 2)
+                    .zip(20..0)
+                    .zip(19..0)
+                    .map(|((t_left, v1), v2)| t_left * (v1 + v2))
+                    .sum::<u32>();
+            if score_upper_bound <= other.score {
+                return StateCmp::StrictlyWorseOrEqual;
+            }
         }
         return StateCmp::Unknown;
     }
@@ -91,7 +111,11 @@ impl StateMemoizer {
     }
 }
 
-pub fn find_pressure_release_potential(cave: Cave, starting_positions: Vec<ValveLabel>, time: u32) -> anyhow::Result<u32> {
+pub fn find_pressure_release_potential(
+    cave: Cave,
+    starting_positions: Vec<ValveLabel>,
+    time: u32,
+) -> anyhow::Result<u32> {
     let mut states: VecDeque<State> = VecDeque::new();
     let closed_valves = cave
         .valves
@@ -185,11 +209,13 @@ pub fn find_pressure_release_potential(cave: Cave, starting_positions: Vec<Valve
             StateMemoizationResult::PotentiallyBest => false,
         };
 
-        states.extend(follow_states.iter().filter(|state| !prune(state)).cloned());
+        // Prune
+        follow_states_next
+            .extend(follow_states.iter().filter(|state| !prune(state)).cloned());
 
-        if state_cnt % 1_000_000 == 0 {
-            println!("(DEBUG) Working state count {}", states.len());
-        }
+        // Enqueue follow states, best scores first
+        follow_states_next.sort_by(|a, b| b.score.cmp(&a.score));
+        states.extend(follow_states_next.iter().cloned());
     }
 
     println!("(INFO) During the solve, {prune_cnt} states were pruned and {state_cnt} states were visited");

@@ -83,13 +83,13 @@ impl Iterator for ValveIndices {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Valve {
     pub flow_rate: u32,
     pub tunnels: ValveBitMask,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Cave {
     pub valves: Vec<Valve>,
     pub valve_labels: Vec<input::ValveLabel>,
