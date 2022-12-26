@@ -16,24 +16,29 @@ struct State {
 }
 
 enum StateCmp {
-    StrictlyBetterOrEqual,
+    StrictlyBetter,
     StrictlyWorseOrEqual,
     Unknown,
 }
 
 impl State {
+    /// Compare two states given that the actors are in the same positions
+    ///
+    /// Note: self's positions has to be a permutation of other's positions, this
+    /// condition is not checked
     fn compare_to(&self, other: &State) -> StateCmp {
-        if self.score >= other.score
-            && self.time_left >= other.time_left
-            && self.closed_valves.is_superset(other.closed_valves)
-        {
-            return StateCmp::StrictlyBetterOrEqual;
-        }
         if self.score <= other.score
             && self.time_left <= other.time_left
             && self.closed_valves.is_subset(other.closed_valves)
         {
             return StateCmp::StrictlyWorseOrEqual;
+        }
+        // We know here that the states are not equally as good
+        if self.score >= other.score
+            && self.time_left >= other.time_left
+            && self.closed_valves.is_superset(other.closed_valves)
+        {
+            return StateCmp::StrictlyBetter;
         }
         return StateCmp::Unknown;
     }
@@ -63,7 +68,7 @@ impl StateMemoizer {
             .or_insert(vec![]);
         for known in states_at_valve.iter_mut() {
             match s.compare_to(known) {
-                StateCmp::StrictlyBetterOrEqual => {
+                StateCmp::StrictlyBetter => {
                     *known = s.clone();
                     return StateMemoizationResult::PotentiallyBest;
                 }
