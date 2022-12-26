@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use anyhow::{anyhow, Context};
 use local_vec::LocalVec;
@@ -92,7 +92,7 @@ impl StateMemoizer {
 }
 
 pub fn find_pressure_release_potential(cave: Cave, starting_positions: Vec<ValveLabel>, time: u32) -> anyhow::Result<u32> {
-    let mut states: Vec<State> = vec![];
+    let mut states: VecDeque<State> = VecDeque::new();
     let closed_valves = cave
         .valves
         .iter()
@@ -120,7 +120,7 @@ pub fn find_pressure_release_potential(cave: Cave, starting_positions: Vec<Valve
             }),
             Err(e) => Err(e),
         })?;
-    states.push(State {
+    states.push_back(State {
         positions: starting_positions,
         closed_valves,
         score: 0,
@@ -131,8 +131,7 @@ pub fn find_pressure_release_potential(cave: Cave, starting_positions: Vec<Valve
     let mut prune_cnt = 0usize;
     while !states.is_empty() {
         state_cnt += 1;
-
-        let s = states.pop().unwrap();
+        let s = states.pop_front().unwrap();
 
         // Check if leaf node
         if s.time_left == 0 || *s.closed_valves == 0 {
@@ -187,6 +186,10 @@ pub fn find_pressure_release_potential(cave: Cave, starting_positions: Vec<Valve
         };
 
         states.extend(follow_states.iter().filter(|state| !prune(state)).cloned());
+
+        if state_cnt % 1_000_000 == 0 {
+            println!("(DEBUG) Working state count {}", states.len());
+        }
     }
 
     println!("(INFO) During the solve, {prune_cnt} states were pruned and {state_cnt} states were visited");
