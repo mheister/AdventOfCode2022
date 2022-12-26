@@ -1,11 +1,14 @@
-use anyhow::{anyhow, Context};
+use std::collections::HashMap;
 
-use crate::preprocessing::*;
+use anyhow::{anyhow, Context};
+use local_vec::LocalVec;
+
+use crate::{input::ValveLabel, preprocessing::*};
 
 /// A node in the solution search tree
 #[derive(Clone)]
 struct State {
-    pos: ValveIdx,
+    positions: LocalVec<ValveIdx, 2>,
     closed_valves: ValveBitMask,
     /// Amount of pressure that would be released if we did nothing more
     score: u32,
@@ -20,9 +23,6 @@ enum StateCmp {
 
 impl State {
     fn compare_to(&self, other: &State) -> StateCmp {
-        if self.pos != other.pos {
-            return StateCmp::Unknown;
-        }
         if self.score >= other.score
             && self.time_left >= other.time_left
             && self.closed_valves.is_superset(other.closed_valves)
@@ -40,7 +40,8 @@ impl State {
 }
 
 struct StateMemoizer {
-    best_known: Vec<Vec<State>>,
+    /// Best known state for a combination (bit mask) of positions
+    best_known: HashMap<ValveBitMask, Vec<State>>,
 }
 
 enum StateMemoizationResult {
@@ -49,14 +50,17 @@ enum StateMemoizationResult {
 }
 
 impl StateMemoizer {
-    fn new(n: usize) -> Self {
+    fn new() -> Self {
         Self {
-            best_known: vec![vec![]; n],
+            best_known: HashMap::new(),
         }
     }
 
     fn memoize(&mut self, s: &State) -> StateMemoizationResult {
-        let states_at_valve = &mut self.best_known[s.pos as usize];
+        let states_at_valve = self
+            .best_known
+            .entry(s.positions.iter().cloned().collect())
+            .or_insert(vec![]);
         for known in states_at_valve.iter_mut() {
             match s.compare_to(known) {
                 StateCmp::StrictlyBetterOrEqual => {
@@ -76,13 +80,13 @@ impl StateMemoizer {
     fn get_best_score(&self) -> Option<u32> {
         self.best_known
             .iter()
-            .flat_map(|v| v.iter())
+            .flat_map(|(_, v)| v.iter())
             .map(|s| s.score)
             .max()
     }
 }
 
-pub fn find_pressure_release_potential(cave: Cave) -> anyhow::Result<u32> {
+pub fn find_pressure_release_potential(cave: Cave, starting_positions: Vec<ValveLabel>, time: u32) -> anyhow::Result<u32> {
     let mut states: Vec<State> = vec![];
     let closed_valves = cave
         .valves
@@ -92,18 +96,32 @@ pub fn find_pressure_release_potential(cave: Cave) -> anyhow::Result<u32> {
         .filter(|(_, v)| v.flow_rate > 0)
         .map(|(idx, _)| idx as ValveIdx)
         .collect();
+    let starting_positions = starting_positions
+        .iter()
+        .map(|label| {
+            cave.valve_labels
+                .iter()
+                .position(|&p| p == *label)
+                .ok_or(anyhow!("Could not find starting valve {label}"))
+                .and_then(|p| {
+                    ValveIdx::try_from(p)
+                        .context(format!("Index of {label} valve out of bounds"))
+                })
+        })
+        .fold(Ok(LocalVec::<_, 2>::new()), |acc, p| match p {
+            Ok(p) => acc.map(|mut v| {
+                v.push(p);
+                v
+            }),
+            Err(e) => Err(e),
+        })?;
     states.push(State {
-        pos: cave
-            .valve_labels
-            .iter()
-            .position(|&p| p == "AA".parse().unwrap())
-            .ok_or(anyhow!("Could not find starting valve AA"))
-            .and_then(|p| u8::try_from(p).context("Index of AA valve out of bounds"))?,
+        positions: starting_positions,
         closed_valves,
         score: 0,
-        time_left: 30,
+        time_left: time,
     });
-    let mut mem = StateMemoizer::new(cave.valves.len());
+    let mut mem = StateMemoizer::new();
     let mut state_cnt = 0usize;
     let mut prune_cnt = 0usize;
     while !states.is_empty() {
@@ -116,44 +134,56 @@ pub fn find_pressure_release_potential(cave: Cave) -> anyhow::Result<u32> {
             continue;
         }
 
-        // Open valve
-        if s.closed_valves.contains(s.pos) {
-            let mut closed_valves = s.closed_valves.clone();
-            closed_valves.remove(s.pos);
-            let s_prime = State {
-                closed_valves,
-                score: s.score + (s.time_left - 1) * cave[s.pos].flow_rate,
-                time_left: s.time_left - 1,
-                ..s
-            };
-            match mem.memoize(&s_prime) {
-                StateMemoizationResult::SeenBetter => {
-                    prune_cnt += 1;
+        let mut follow_states_0 = LocalVec::<State, 100>::new();
+        let mut follow_states_1 = LocalVec::<State, 100>::new();
+
+        let follow_states = &mut follow_states_0;
+        let follow_states_next = &mut follow_states_1;
+
+        follow_states.push(State {
+            time_left: s.time_left - 1,
+            ..s.clone()
+        });
+
+        for (actor, pos) in s.positions.iter().enumerate() {
+            while let Some(s) = follow_states.pop() {
+                // Open valve
+                if s.closed_valves.contains(*pos) {
+                    let mut closed_valves = s.closed_valves.clone();
+                    closed_valves.remove(*pos);
+                    let s_prime = State {
+                        closed_valves,
+                        score: s.score + s.time_left * cave[*pos].flow_rate,
+                        ..s.clone()
+                    };
+                    follow_states_next.push(s_prime);
                 }
-                StateMemoizationResult::PotentiallyBest => {
-                    states.push(s_prime);
+                // Move on
+                let valve = &cave[*pos];
+                for target in valve.tunnels.iter() {
+                    let mut positions = s.positions.clone();
+                    positions[actor] = target;
+                    let s_prime = State {
+                        positions,
+                        ..s.clone()
+                    };
+                    follow_states_next.push(s_prime);
                 }
             }
+            std::mem::swap(follow_states, follow_states_next);
         }
 
-        // Move on
-        let valve = &cave[s.pos];
-        for target in valve.tunnels.iter() {
-            let s_prime = State {
-                pos: target,
-                time_left: s.time_left - 1,
-                ..s.clone()
-            };
-            match mem.memoize(&s_prime) {
-                StateMemoizationResult::SeenBetter => {
-                    prune_cnt += 1;
-                }
-                StateMemoizationResult::PotentiallyBest => {
-                    states.push(s_prime);
-                }
+        let mut prune = |state: &State| match mem.memoize(state) {
+            StateMemoizationResult::SeenBetter => {
+                prune_cnt += 1;
+                true
             }
-        }
+            StateMemoizationResult::PotentiallyBest => false,
+        };
+
+        states.extend(follow_states.iter().filter(|state| !prune(state)).cloned());
     }
+
     println!("(INFO) During the solve, {prune_cnt} states were pruned and {state_cnt} states were visited");
     mem.get_best_score().ok_or(anyhow!(
         "Did not find anything! Are there any reachable valves with positive flow rate?"

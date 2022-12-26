@@ -138,6 +138,7 @@ name = "day16"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "local_vec",
  "nom",
 ]
 
@@ -238,6 +239,12 @@ name = "linux-raw-sys"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f9f08d8963a6c613f4b1a78f4f4a4dbfadf8e6545b2d72861731e4858b8b47f"
+
+[[package]]
+name = "local_vec"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99bc3de0b61b7a93fe3844a626d0c428a7bf67fb47eab136a8931e44df318081"
 
 [[package]]
 name = "log"

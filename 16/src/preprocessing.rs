@@ -4,7 +4,7 @@ use crate::input;
 
 pub type ValveIdx = u8;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ValveBitMask(pub u64);
 
 impl Deref for ValveBitMask {
