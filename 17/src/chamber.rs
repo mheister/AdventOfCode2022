@@ -21,6 +21,7 @@ pub struct JetPattern(Vec<Jet>);
 
 pub struct Chamber {
     grid: Grid<Tile>,
+    base_y: usize, // height from which we store data in grid
     high_point: i32,
     rock_shapes: Vec<RockShape>,
     next_rock_shape_idx: usize,
@@ -36,6 +37,7 @@ impl Chamber {
                 data: vec![Tile::Air; 7 * 5000],
                 width: 7,
             },
+            base_y: 0,
             rock_shapes,
             high_point: -1,
             next_rock_shape_idx: 0,
@@ -45,7 +47,7 @@ impl Chamber {
     }
 
     pub fn tower_height(&self) -> usize {
-        (self.high_point + 1).try_into().unwrap()
+        self.base_y + (self.high_point + 1) as usize
     }
 
     pub fn rumble(&mut self, n_rocks: usize) {
@@ -135,12 +137,49 @@ impl Chamber {
                 }
             }
         }
+        self.adjust_view();
+    }
+
+    fn adjust_view(&mut self) {
+        const MAX_CHAMBER_VIEW_HEIGHT: i32 = 300_000;
+        if self.high_point <= MAX_CHAMBER_VIEW_HEIGHT {
+            return;
+        }
+        let rows_to_keep = self
+            .grid
+            .data
+            .chunks(self.grid.width)
+            .rev()
+            .enumerate()
+            .skip(self.grid.height() - (self.high_point + 1) as usize)
+            .scan(vec![false; self.grid.width], |acc, (n, row)| {
+                for (acc, tile) in acc.iter_mut().zip(row.iter()) {
+                    if *tile == Tile::Rock {
+                        *acc = true;
+                    }
+                }
+                if acc.iter().all(|&b| b) {
+                    None
+                } else {
+                    Some(n)
+                }
+            })
+            .last()
+            .unwrap_or(0)
+            + 10;
+        if rows_to_keep >= self.grid.height() {
+            return;
+        }
+        let rows_to_cut = self.grid.height() - rows_to_keep;
+        self.base_y += rows_to_cut;
+        self.high_point -= rows_to_cut as i32;
+        self.grid.data.drain(0..rows_to_cut * self.grid.width);
     }
 }
 
 impl fmt::Display for Chamber {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let height = self.tower_height() + 1;
+        let height = (self.high_point + 2) as usize;
         self.grid
             .data
             .chunks(self.grid.width)

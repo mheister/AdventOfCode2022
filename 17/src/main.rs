@@ -8,8 +8,18 @@ fn main() {
     let input_file_path = env::args().nth(1).unwrap_or("17/input.txt".into());
     let input = fs::read_to_string(&input_file_path).unwrap();
     let mut chamber = Chamber::new(input.parse().unwrap());
-    chamber.rumble(2022);
-    println!("Tower height after 2022 rocks: {}", chamber.tower_height());
+    let n_rocks_part1 = 2022;
+    let n_rocks_part2 = 1_000_000_000_000;
+    chamber.rumble(n_rocks_part1);
+    println!(
+        "Tower height after {n_rocks_part1} rocks: {}",
+        chamber.tower_height()
+    );
+    chamber.rumble(n_rocks_part2 - n_rocks_part1);
+    println!(
+        "Tower height after {n_rocks_part2} rocks: {}",
+        chamber.tower_height()
+    );
 }
 
 #[cfg(test)]
