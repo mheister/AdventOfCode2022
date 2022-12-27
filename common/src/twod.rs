@@ -71,11 +71,27 @@ impl<T> Grid<T>
 where
     T: Copy,
 {
+    pub fn height(&self) -> usize {
+        self.data.len() / self.width
+    }
+
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
+    pub fn ensure_height(&mut self, min_height: usize, fill: T) {
+        let min_size = min_height * self.width;
+        if self.data.len() < min_size {
+            self.data.resize(min_size, fill);
+        }
+    }
+
     pub fn fill_path(&mut self, path: &[Point], item: T) {
         for segment in path.windows(2) {
             self.fill_line(*segment.get(0).unwrap(), *segment.get(1).unwrap(), item);
         }
     }
+
     pub fn fill_line(&mut self, p1: Point, p2: Point, item: T) {
         let mut p = p1;
         while p != p2 {
