@@ -1,5 +1,5 @@
 use common::twod::Point;
-use std::{fmt, str::FromStr};
+use std::{collections::HashMap, fmt, str::FromStr};
 
 const CHAMBER_WIDTH: usize = 7;
 const MAX_ROCK_SHAPE_HEIGHT: usize = 4;
@@ -48,11 +48,50 @@ impl Chamber {
     }
 
     pub fn rumble(&mut self, n_rocks: usize) {
+        let periodicity_check_interval = self.rock_shapes.len() * self.jet_pattern.len();
+        struct CheckPoint {
+            n_rocks_dropped: usize,
+            base_y: usize,
+        }
+        let mut checkpoints = HashMap::<Vec<u8>, CheckPoint>::new();
+        let mut n_rocks_dropped = n_rocks;
         for i in 0..n_rocks {
             self.drop_rock();
-            if i % 100_000_000 == 0 {
-                println!("(INFO) {}M rocks dropped", i / 1_000_000);
+            if i > 0 && i % periodicity_check_interval == 0 {
+                self.adjust_view();
+                let key: Vec<u8> = self
+                    .grid
+                    .iter()
+                    .cloned()
+                    .take((self.high_point + 1) as usize)
+                    .collect();
+                match checkpoints.entry(key) {
+                    std::collections::hash_map::Entry::Occupied(entry) => {
+                        let cp = entry.get();
+                        let d_rocks = i + 1 - cp.n_rocks_dropped;
+                        assert!(d_rocks > 0);
+                        let d_base = self.base_y - cp.base_y;
+                        println!(
+                            "(INFO) found periodicity of len {}M (rocks dropped) and height difference {}M",
+                            d_rocks / 1_000_000,
+                            d_base / 1_000_000
+                        );
+                        let to_drop_still = n_rocks - i - 1;
+                        self.base_y += (to_drop_still / d_rocks) * d_base;
+                        n_rocks_dropped = i + 1 + (to_drop_still / d_rocks) * d_rocks;
+                        break;
+                    }
+                    std::collections::hash_map::Entry::Vacant(entry) => {
+                        entry.insert(CheckPoint {
+                            n_rocks_dropped: i + 1,
+                            base_y: self.base_y,
+                        });
+                    }
+                }
             }
+        }
+        for _ in n_rocks_dropped..n_rocks {
+            self.drop_rock();
         }
     }
 
@@ -63,7 +102,7 @@ impl Chamber {
             .unwrap()
             .clone();
         self.next_rock_shape_idx = (self.next_rock_shape_idx + 1) % self.rock_shapes.len();
-        let req_height = self.tower_height() + 4 + MAX_ROCK_SHAPE_HEIGHT;
+        let req_height = (self.high_point + 1) as usize + 4 + MAX_ROCK_SHAPE_HEIGHT;
         if self.grid.len() < req_height {
             self.grid.resize(req_height, GRID_ROW_INITVAL);
         }
@@ -122,14 +161,13 @@ impl Chamber {
             .find(|&v| self.grid[v as usize] & 0b1111111 == 0)
             .unwrap_or(self.grid.len() as i32)
             - 1;
-        self.adjust_view();
+        const MAX_CHAMBER_VIEW_HEIGHT: i32 = 300_000;
+        if self.high_point > MAX_CHAMBER_VIEW_HEIGHT {
+            self.adjust_view();
+        }
     }
 
     fn adjust_view(&mut self) {
-        const MAX_CHAMBER_VIEW_HEIGHT: i32 = 300_000;
-        if self.high_point <= MAX_CHAMBER_VIEW_HEIGHT {
-            return;
-        }
         let rows_to_keep = self
             .grid
             .iter()
@@ -243,9 +281,9 @@ fn get_rock_shapes() -> Vec<RockShape> {
         .map(|base| {
             let mut translation_set = [*base; CHAMBER_WIDTH + 1];
             for t in 1..CHAMBER_WIDTH + 1 {
-                    translation_set[t].iter_mut().for_each(|row| {
-                        *row <<= t;
-                    })
+                translation_set[t].iter_mut().for_each(|row| {
+                    *row <<= t;
+                })
             }
             translation_set
         })
