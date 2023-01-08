@@ -87,7 +87,7 @@ impl Droplet {
     }
 
     pub fn exterior_surface_area(&self) -> usize {
-        let cubes_map = self.0.iter().cloned().collect::<HashSet<_>>();
+        let cubes_map = self.0.iter().cloned().collect::<HashSet<Cube>>();
         let mut air_cubes = HashSet::<Cube>::new();
         let mut surface = 0;
         for cube in self.0.iter() {
@@ -104,7 +104,7 @@ impl Droplet {
             let starting_air_cube = air_cubes.iter().next().unwrap().clone();
             air_cubes.remove(&starting_air_cube);
             let mut air_pocket = vec![starting_air_cube];
-            let mut air_pocket_map = air_pocket.iter().cloned().collect::<HashSet<_>>();
+            let mut air_pocket_map = air_pocket.iter().cloned().collect::<HashSet<Cube>>();
             let mut pidx = 0;
             loop {
                 if pidx >= air_pocket.len() {
